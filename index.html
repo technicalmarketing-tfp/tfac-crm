@@ -29,6 +29,7 @@
         .tracking-badge { position: absolute; top: -4px; right: -4px; width: 8px; height: 8px; background: #10b981; border-radius: 50%; animation: pulse 2s infinite; }
         @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
+<base target="_blank">
 </head>
 <body class="bg-slate-50">
 
@@ -608,21 +609,21 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function showSection(section) {
-    document.querySelectorAll('[id$="-section"]').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('[id$="-section"]').forEach(el => {
+        if (el) el.classList.add('hidden');
+    });
     const targetSection = document.getElementById(section + '-section');
     if (targetSection) targetSection.classList.remove('hidden');
-    
-    document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
-    
-    // Encontrar el sidebar-item correspondiente
+    document.querySelectorAll('.sidebar-item').forEach(el => {
+        if (el) el.classList.remove('active');
+    });
     const sidebarItems = document.querySelectorAll('.sidebar-item');
     sidebarItems.forEach(item => {
-        const onclick = item.getAttribute('onclick');
-        if (onclick && onclick.includes("showSection('" + section + "')")) {
+        const onclickAttr = item.getAttribute('onclick');
+        if (onclickAttr && onclickAttr.includes("showSection('" + section + "')")) {
             item.classList.add('active');
         }
     });
-    
     const titles = {
         'dashboard': ['Dashboard', 'Resumen general de tus campanas'],
         'pipeline': ['Pipeline', 'Gestion visual de tus contactos'],
@@ -633,8 +634,12 @@ function showSection(section) {
         'tracking': ['Tracking en Vivo', 'Monitoreo de actividad en tiempo real'],
         'config': ['Configuracion', 'Conectar Gmail y Google Workspace']
     };
-    document.getElementById('section-title').textContent = titles[section][0];
-    document.getElementById('section-subtitle').textContent = titles[section][1];
+    const titleEl = document.getElementById('section-title');
+    const subtitleEl = document.getElementById('section-subtitle');
+    if (titles[section]) {
+        if (titleEl) titleEl.textContent = titles[section][0];
+        if (subtitleEl) subtitleEl.textContent = titles[section][1];
+    }
 }
 
 function checkConfig() {
@@ -653,25 +658,18 @@ function updateDashboard() {
     const converted = contacts.filter(c => c.status === 'converted').length;
     const openRate = totalSent > 0 ? Math.round((contacts.filter(c => c.opens > 0).length / totalSent) * 100) : 0;
     const clickRate = totalSent > 0 ? Math.round((contacts.filter(c => c.clicks > 0).length / totalSent) * 100) : 0;
-    
     const totalSentEl = document.getElementById('total-sent');
     if (totalSentEl) totalSentEl.textContent = totalSent;
-    
     const openRateEl = document.getElementById('open-rate');
     if (openRateEl) openRateEl.textContent = openRate + '%';
-    
     const clickRateEl = document.getElementById('click-rate');
     if (clickRateEl) clickRateEl.textContent = clickRate + '%';
-    
     const replyRateEl = document.getElementById('reply-rate');
     if (replyRateEl) replyRateEl.textContent = Math.round((converted / (totalSent || 1)) * 100) + '%';
-    
     const openRateBar = document.getElementById('open-rate-bar');
     if (openRateBar) openRateBar.style.width = openRate + '%';
-    
     const clickRateBar = document.getElementById('click-rate-bar');
     if (clickRateBar) clickRateBar.style.width = clickRate + '%';
-
     const activities = [
         { icon: 'fa-envelope-open', color: 'text-yellow-500', bg: 'bg-yellow-100', text: 'Maria Gonzalez abrio el email "Boletin Tecnico Mayo"', time: 'Hace 5 minutos' },
         { icon: 'fa-mouse-pointer', color: 'text-blue-500', bg: 'bg-blue-100', text: 'Juan Perez hizo clic en "Leer Mas Detalles"', time: 'Hace 12 minutos' },
@@ -679,7 +677,6 @@ function updateDashboard() {
         { icon: 'fa-download', color: 'text-green-500', bg: 'bg-green-100', text: 'Carlos Rodriguez descargo el adjunto "Propuesta.pdf"', time: 'Hace 2 horas' },
         { icon: 'fa-reply', color: 'text-purple-500', bg: 'bg-purple-100', text: 'Carmen Silva respondio al email de seguimiento', time: 'Hace 3 horas' }
     ];
-    
     const activityFeed = document.getElementById('activity-feed');
     if (activityFeed) {
         activityFeed.innerHTML = activities.map(a => 
@@ -989,15 +986,21 @@ function handleCSVUpload(event) {
 }
 
 function openModal(modalId) {
-    document.getElementById('modal-overlay').classList.remove('hidden');
-    document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
+    const overlay = document.getElementById('modal-overlay');
+    if (overlay) overlay.classList.remove('hidden');
+    document.querySelectorAll('[id^="modal-"]').forEach(m => {
+        if (m) m.classList.add('hidden');
+    });
     const modal = document.getElementById('modal-' + modalId);
     if (modal) modal.classList.remove('hidden');
 }
 
 function closeModal() {
-    document.getElementById('modal-overlay').classList.add('hidden');
-    document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
+    const overlay = document.getElementById('modal-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    document.querySelectorAll('[id^="modal-"]').forEach(m => {
+        if (m) m.classList.add('hidden');
+    });
 }
 
 function createCampaign() {
