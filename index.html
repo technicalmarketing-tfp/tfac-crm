@@ -642,12 +642,24 @@ function updateDashboard() {
     const converted = contacts.filter(c => c.status === 'converted').length;
     const openRate = totalSent > 0 ? Math.round((contacts.filter(c => c.opens > 0).length / totalSent) * 100) : 0;
     const clickRate = totalSent > 0 ? Math.round((contacts.filter(c => c.clicks > 0).length / totalSent) * 100) : 0;
-    document.getElementById('total-sent').textContent = totalSent;
-    document.getElementById('open-rate').textContent = openRate + '%';
-    document.getElementById('click-rate').textContent = clickRate + '%';
-    document.getElementById('conversion-count').textContent = converted;
-    document.getElementById('open-rate-bar').style.width = openRate + '%';
-    document.getElementById('click-rate-bar').style.width = clickRate + '%';
+    
+    const totalSentEl = document.getElementById('total-sent');
+    if (totalSentEl) totalSentEl.textContent = totalSent;
+    
+    const openRateEl = document.getElementById('open-rate');
+    if (openRateEl) openRateEl.textContent = openRate + '%';
+    
+    const clickRateEl = document.getElementById('click-rate');
+    if (clickRateEl) clickRateEl.textContent = clickRate + '%';
+    
+    const replyRateEl = document.getElementById('reply-rate');
+    if (replyRateEl) replyRateEl.textContent = Math.round((converted / (totalSent || 1)) * 100) + '%';
+    
+    const openRateBar = document.getElementById('open-rate-bar');
+    if (openRateBar) openRateBar.style.width = openRate + '%';
+    
+    const clickRateBar = document.getElementById('click-rate-bar');
+    if (clickRateBar) clickRateBar.style.width = clickRate + '%';
 
     const activities = [
         { icon: 'fa-envelope-open', color: 'text-yellow-500', bg: 'bg-yellow-100', text: 'Maria Gonzalez abrio el email "Boletin Tecnico Mayo"', time: 'Hace 5 minutos' },
@@ -656,11 +668,15 @@ function updateDashboard() {
         { icon: 'fa-download', color: 'text-green-500', bg: 'bg-green-100', text: 'Carlos Rodriguez descargo el adjunto "Propuesta.pdf"', time: 'Hace 2 horas' },
         { icon: 'fa-reply', color: 'text-purple-500', bg: 'bg-purple-100', text: 'Carmen Silva respondio al email de seguimiento', time: 'Hace 3 horas' }
     ];
-    document.getElementById('activity-feed').innerHTML = activities.map(a => 
-        '<div class="flex items-start gap-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">' +
-        '<div class="w-10 h-10 ' + a.bg + ' rounded-full flex items-center justify-center flex-shrink-0"><i class="fas ' + a.icon + ' ' + a.color + '"></i></div>' +
-        '<div class="flex-1"><p class="text-sm text-gray-800">' + a.text + '</p><p class="text-xs text-gray-400 mt-1">' + a.time + '</p></div></div>'
-    ).join('');
+    
+    const activityFeed = document.getElementById('activity-feed');
+    if (activityFeed) {
+        activityFeed.innerHTML = activities.map(a => 
+            '<div class="flex items-start gap-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">' +
+            '<div class="w-10 h-10 ' + a.bg + ' rounded-full flex items-center justify-center flex-shrink-0"><i class="fas ' + a.icon + ' ' + a.color + '"></i></div>' +
+            '<div class="flex-1"><p class="text-sm text-gray-800">' + a.text + '</p><p class="text-xs text-gray-400 mt-1">' + a.time + '</p></div></div>'
+        ).join('');
+    }
 }
 
 function renderPipeline() {
