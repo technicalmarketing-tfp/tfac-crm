@@ -609,9 +609,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function showSection(section) {
     document.querySelectorAll('[id$="-section"]').forEach(el => el.classList.add('hidden'));
-    document.getElementById(section + '-section').classList.remove('hidden');
+    const targetSection = document.getElementById(section + '-section');
+    if (targetSection) targetSection.classList.remove('hidden');
+    
     document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
-    event.target.closest('.sidebar-item').classList.add('active');
+    
+    // Encontrar el sidebar-item correspondiente
+    const sidebarItems = document.querySelectorAll('.sidebar-item');
+    sidebarItems.forEach(item => {
+        const onclick = item.getAttribute('onclick');
+        if (onclick && onclick.includes("showSection('" + section + "')")) {
+            item.classList.add('active');
+        }
+    });
+    
     const titles = {
         'dashboard': ['Dashboard', 'Resumen general de tus campanas'],
         'pipeline': ['Pipeline', 'Gestion visual de tus contactos'],
@@ -980,7 +991,8 @@ function handleCSVUpload(event) {
 function openModal(modalId) {
     document.getElementById('modal-overlay').classList.remove('hidden');
     document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
-    document.getElementById('modal-' + modalId).classList.remove('hidden');
+    const modal = document.getElementById('modal-' + modalId);
+    if (modal) modal.classList.remove('hidden');
 }
 
 function closeModal() {
