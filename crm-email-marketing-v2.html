@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Email Marketing Pro v2 - TFAC</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #f1f5f9; }
+        .pipeline-column { min-height: 500px; transition: all 0.3s ease; }
+        .pipeline-column.drag-over { background: #e0e7ff; border: 2px dashed #6366f1; }
+        .contact-card { transition: all 0.2s ease; cursor: grab; }
+        .contact-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
+        .contact-card.dragging { opacity: 0.5; cursor: grabbing; }
+        .metric-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .email-preview { font-family: 'Georgia', serif; line-height: 1.6; }
+        .sidebar-item.active { background: #e0e7ff; color: #4f46e5; border-right: 3px solid #4f46e5; }
+        .toast { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .heatmap-cell { width: 12px; height: 12px; border-radius: 2px; }
+        .heatmap-grid { display: grid; grid-template-columns: 40px repeat(24, 1fr); gap: 2px; }
+        .config-panel { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .status-connected { background: #10b981; box-shadow: 0 0 8px #10b981; }
+        .status-disconnected { background: #ef4444; }
+        .tracking-badge { position: absolute; top: -4px; right: -4px; width: 8px; height: 8px; background: #10b981; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body class="bg-slate-50">
+
+<!-- CONFIGURACION -->
+<script>
+const CONFIG = {
+    GOOGLE_SCRIPT_URL: '', // Pega aqui tu URL de Apps Script
+    SPREADSHEET_ID: '',    // ID de tu Google Sheet
+    SENDER_EMAIL: 'technicalmarketing@tfacpart.com',
+    COMPANY_NAME: 'TFAC Part',
+    DOMAIN: 'tfacpart.com'
+};
+</script>
+
+    <!-- Sidebar -->
+    <div class="fixed left-0 top-0 h-full w-64 bg-white shadow-lg z-50">
+        <div class="p-6 border-b">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-envelope-open-text text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-gray-800 text-lg">TFAC CRM</h1>
+                    <p class="text-xs text-gray-500">Email Marketing Pro</p>
+                </div>
+            </div>
+        </div>
+        <nav class="mt-6">
+            <a href="#" onclick="showSection('dashboard')" class="sidebar-item active flex items-center gap-3 px-6 py-3 text-gray-600 hover:bg-gray-50 transition-colors">
+                <i class="fas fa-chart-line w-5"></i><span>Dashboard</span>
+            </a>
+            <a href="#" onclick="showSection('pipeline')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-gray-600 hover:bg-gray-50 transition-colors">
+                <i class="fas fa-columns w-5"></i><span>Pipeline</span>
+                <span id="pipeline-count" class="ml-auto bg-indigo-100 text-indigo-600 text-xs px-2 py-1 rounded-full">0</span>
+            </a>
+            <a href="#" onclick="showSection('contacts')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-gray-600 hover:bg-gray-50 transition-colors">
+                <i class="fas fa-users w-5"></i><span>Contactos</span>
+                <span id="contacts-count" class="ml-auto bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">0</span>
+            </a>
+            <a href="#" onclick="showSection('campaigns')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-gray-600 hover:bg-gray-50 transition-colors">
+                <i class="fas fa-bullhorn w-5"></i><span>Campañas</span>
+            </a>
+            <a href="#" onclick="showSection('templates')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-gray-600 hover:bg-gray-50 transition-colors">
+                <i class="fas fa-layer-group w-5"></i><span>Plantillas</span>
+            </a>
+            <a href="#" onclick="showSection('analytics')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-gray-600 hover:bg-gray-50 transition-colors">
+                <i class="fas fa-chart-pie w-5"></i><span>Analiticas</span>
+            </a>
+            <a href="#" onclick="showSection('tracking')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-gray-600 hover:bg-gray-50 transition-colors">
+                <i class="fas fa-eye w-5"></i><span>Tracking en Vivo</span>
+                <span id="live-tracking-badge" class="ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full hidden">●</span>
+            </a>
+            <a href="#" onclick="showSection('config')" class="sidebar-item flex items-center gap-3 px-6 py-3 text-gray-600 hover:bg-gray-50 transition-colors">
+                <i class="fas fa-cog w-5"></i><span>Configuracion Gmail</span>
+                <span id="config-status-dot" class="ml-auto status-dot status-disconnected"></span>
+            </a>
+        </nav>
+        <div class="absolute bottom-0 left-0 right-0 p-6 border-t bg-gray-50">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center"><i class="fas fa-user text-gray-600"></i></div>
+                <div>
+                    <p class="text-sm font-medium text-gray-700">technicalmarketing</p>
+                    <p class="text-xs text-gray-500">@tfacpart.com</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="ml-64 p-8">
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h2 id="section-title" class="text-2xl font-bold text-gray-800">Dashboard</h2>
+                <p id="section-subtitle" class="text-gray-500 mt-1">Resumen general de tus campanas</p>
+            </div>
+            <div class="flex gap-3">
+                <div id="connection-status" class="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-lg text-sm border border-red-200">
+                    <i class="fas fa-circle text-xs"></i>
+                    <span>Sin conexion a Gmail</span>
+                </div>
+                <button onclick="document.getElementById('csvInput').click()" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center gap-2 transition-colors">
+                    <i class="fas fa-upload"></i>Importar CSV
+                </button>
+                <input type="file" id="csvInput" accept=".csv" class="hidden" onchange="handleCSVUpload(event)">
+                <button onclick="openModal('newCampaign')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2 transition-colors shadow-lg shadow-indigo-200">
+                    <i class="fas fa-plus"></i>Nueva Campana
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard Section -->
+        <div id="dashboard-section" class="space-y-6">
+            <!-- Alerta de configuracion -->
+            <div id="setup-alert" class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg">
+                <div class="flex items-start gap-3">
+                    <i class="fas fa-exclamation-triangle text-amber-500 mt-1"></i>
+                    <div>
+                        <p class="font-semibold text-amber-800">Configuracion requerida</p>
+                        <p class="text-sm text-amber-700">Para enviar emails reales desde technicalmarketing@tfacpart.com, configura la conexion Gmail en la seccion Configuracion.</p>
+                        <button onclick="showSection('config')" class="mt-2 text-sm bg-amber-600 text-white px-3 py-1 rounded hover:bg-amber-700">Ir a Configuracion</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="metric-card rounded-xl p-6 text-white shadow-lg">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-indigo-100 text-sm font-medium">Emails Enviados</p>
+                            <h3 class="text-3xl font-bold mt-2" id="total-sent">0</h3>
+                        </div>
+                        <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center"><i class="fas fa-paper-plane text-xl"></i></div>
+                    </div>
+                    <div class="mt-4 flex items-center gap-2 text-sm">
+                        <span class="text-green-300"><i class="fas fa-arrow-up"></i> 12%</span>
+                        <span class="text-indigo-100">vs mes pasado</span>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">Tasa de Apertura <span class="text-xs text-gray-400">(estimada)</span></p>
+                            <h3 class="text-3xl font-bold mt-2 text-gray-800" id="open-rate">0%</h3>
+                        </div>
+                        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center"><i class="fas fa-envelope-open text-green-600 text-xl"></i></div>
+                    </div>
+                    <div class="mt-4"><div class="w-full bg-gray-200 rounded-full h-2"><div id="open-rate-bar" class="bg-green-500 h-2 rounded-full transition-all duration-1000" style="width: 0%"></div></div></div>
+                    <p class="text-xs text-gray-400 mt-2"><i class="fas fa-info-circle mr-1"></i>Limitado por privacidad de Apple/Gmail</p>
+                </div>
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">Tasa de Clics <span class="text-xs text-green-600 font-bold">KPI principal</span></p>
+                            <h3 class="text-3xl font-bold mt-2 text-gray-800" id="click-rate">0%</h3>
+                        </div>
+                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center"><i class="fas fa-mouse-pointer text-blue-600 text-xl"></i></div>
+                    </div>
+                    <div class="mt-4"><div class="w-full bg-gray-200 rounded-full h-2"><div id="click-rate-bar" class="bg-blue-500 h-2 rounded-full transition-all duration-1000" style="width: 0%"></div></div></div>
+                </div>
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">Respuestas/Reply Rate</p>
+                            <h3 class="text-3xl font-bold mt-2 text-gray-800" id="reply-rate">0%</h3>
+                        </div>
+                        <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center"><i class="fas fa-reply text-purple-600 text-xl"></i></div>
+                    </div>
+                    <div class="mt-4 flex items-center gap-2 text-sm">
+                        <span class="text-green-600 font-medium"><i class="fas fa-check-circle"></i> 85%</span>
+                        <span class="text-gray-500">tasa de respuesta</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="font-bold text-gray-800">Rendimiento de Campanas</h3>
+                        <select class="text-sm border-gray-300 rounded-lg text-gray-600">
+                            <option>Ultimos 30 dias</option><option>Ultimos 7 dias</option><option>Este mes</option>
+                        </select>
+                    </div>
+                    <canvas id="performanceChart" height="250"></canvas>
+                </div>
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <h3 class="font-bold text-gray-800 mb-4">Dispositivos</h3>
+                    <canvas id="devicesChart" height="250"></canvas>
+                    <div class="mt-4 space-y-2">
+                        <div class="flex justify-between text-sm"><span class="text-gray-600"><i class="fas fa-desktop text-blue-500 mr-2"></i>Desktop</span><span class="font-semibold">58%</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-600"><i class="fas fa-mobile-alt text-green-500 mr-2"></i>Movil</span><span class="font-semibold">35%</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-600"><i class="fas fa-tablet-alt text-purple-500 mr-2"></i>Tablet</span><span class="font-semibold">7%</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                <h3 class="font-bold text-gray-800 mb-4">Actividad Reciente</h3>
+                <div class="space-y-4" id="activity-feed"></div>
+            </div>
+        </div>
+
+        <!-- Pipeline Section -->
+        <div id="pipeline-section" class="hidden">
+            <div class="flex gap-6 overflow-x-auto pb-4">
+                <div class="pipeline-column flex-shrink-0 w-80 bg-gray-100 rounded-xl p-4" ondrop="drop(event, 'pending')" ondragover="allowDrop(event)" ondragleave="dragLeave(event)">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-gray-400"></div><h3 class="font-semibold text-gray-700">Pendiente</h3></div>
+                        <span class="bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full" id="count-pending">0</span>
+                    </div>
+                    <div id="pipeline-pending" class="space-y-3 min-h-[400px]"></div>
+                </div>
+                <div class="pipeline-column flex-shrink-0 w-80 bg-blue-50 rounded-xl p-4" ondrop="drop(event, 'sent')" ondragover="allowDrop(event)" ondragleave="dragLeave(event)">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-blue-500"></div><h3 class="font-semibold text-gray-700">Enviado</h3></div>
+                        <span class="bg-blue-100 text-blue-600 text-xs px-2 py-1 rounded-full" id="count-sent">0</span>
+                    </div>
+                    <div id="pipeline-sent" class="space-y-3 min-h-[400px]"></div>
+                </div>
+                <div class="pipeline-column flex-shrink-0 w-80 bg-yellow-50 rounded-xl p-4" ondrop="drop(event, 'opened')" ondragover="allowDrop(event)" ondragleave="dragLeave(event)">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-yellow-500"></div><h3 class="font-semibold text-gray-700">Visto</h3></div>
+                        <span class="bg-yellow-100 text-yellow-600 text-xs px-2 py-1 rounded-full" id="count-opened">0</span>
+                    </div>
+                    <div id="pipeline-opened" class="space-y-3 min-h-[400px]"></div>
+                </div>
+                <div class="pipeline-column flex-shrink-0 w-80 bg-green-50 rounded-xl p-4" ondrop="drop(event, 'clicked')" ondragover="allowDrop(event)" ondragleave="dragLeave(event)">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-green-500"></div><h3 class="font-semibold text-gray-700">Click/Interaccion</h3></div>
+                        <span class="bg-green-100 text-green-600 text-xs px-2 py-1 rounded-full" id="count-clicked">0</span>
+                    </div>
+                    <div id="pipeline-clicked" class="space-y-3 min-h-[400px]"></div>
+                </div>
+                <div class="pipeline-column flex-shrink-0 w-80 bg-purple-50 rounded-xl p-4" ondrop="drop(event, 'followup')" ondragover="allowDrop(event)" ondragleave="dragLeave(event)">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-purple-500"></div><h3 class="font-semibold text-gray-700">Seguimiento</h3></div>
+                        <span class="bg-purple-100 text-purple-600 text-xs px-2 py-1 rounded-full" id="count-followup">0</span>
+                    </div>
+                    <div id="pipeline-followup" class="space-y-3 min-h-[400px]"></div>
+                </div>
+                <div class="pipeline-column flex-shrink-0 w-80 bg-emerald-50 rounded-xl p-4" ondrop="drop(event, 'converted')" ondragover="allowDrop(event)" ondragleave="dragLeave(event)">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-emerald-500"></div><h3 class="font-semibold text-gray-700">Convertido</h3></div>
+                        <span class="bg-emerald-100 text-emerald-600 text-xs px-2 py-1 rounded-full" id="count-converted">0</span>
+                    </div>
+                    <div id="pipeline-converted" class="space-y-3 min-h-[400px]"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contacts Section -->
+        <div id="contacts-section" class="hidden">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-6 border-b flex justify-between items-center">
+                    <div class="flex gap-4">
+                        <input type="text" id="search-contacts" placeholder="Buscar contactos..." class="border border-gray-300 rounded-lg px-4 py-2 w-64 focus:outline-none focus:ring-2 focus:ring-indigo-500" onkeyup="filterContacts()">
+                        <select id="filter-status" class="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" onchange="filterContacts()">
+                            <option value="">Todos los estados</option>
+                            <option value="pending">Pendiente</option><option value="sent">Enviado</option><option value="opened">Visto</option>
+                            <option value="clicked">Click</option><option value="followup">Seguimiento</option><option value="converted">Convertido</option>
+                        </select>
+                    </div>
+                    <button onclick="openModal('addContact')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"><i class="fas fa-plus mr-2"></i>Agregar Contacto</button>
+                </div>
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contacto</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Empresa</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Metricas</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ultima Actividad</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contacts-table-body" class="divide-y divide-gray-200"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Campaigns Section -->
+        <div id="campaigns-section" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="campaigns-grid"></div>
+        </div>
+
+        <!-- Templates Section -->
+        <div id="templates-section" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onclick="previewTemplate('newsletter')">
+                    <div class="h-48 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center"><i class="fas fa-newspaper text-white text-4xl"></i></div>
+                    <div class="p-6">
+                        <h3 class="font-bold text-gray-800 mb-2">Boletin Tecnico</h3>
+                        <p class="text-gray-500 text-sm mb-4">Plantilla para enviar actualizaciones tecnicas y novedades de producto.</p>
+                        <div class="flex items-center justify-between"><span class="text-xs text-gray-400">Ultimo uso: Hace 2 dias</span><span class="text-indigo-600 text-sm font-medium">Usar <i class="fas fa-arrow-right ml-1"></i></span></div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onclick="previewTemplate('promo')">
+                    <div class="h-48 bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center"><i class="fas fa-percent text-white text-4xl"></i></div>
+                    <div class="p-6">
+                        <h3 class="font-bold text-gray-800 mb-2">Promocion Especial</h3>
+                        <p class="text-gray-500 text-sm mb-4">Plantilla para ofertas y descuentos especiales para clientes.</p>
+                        <div class="flex items-center justify-between"><span class="text-xs text-gray-400">Ultimo uso: Hace 5 dias</span><span class="text-indigo-600 text-sm font-medium">Usar <i class="fas fa-arrow-right ml-1"></i></span></div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onclick="previewTemplate('followup')">
+                    <div class="h-48 bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center"><i class="fas fa-handshake text-white text-4xl"></i></div>
+                    <div class="p-6">
+                        <h3 class="font-bold text-gray-800 mb-2">Seguimiento de Ventas</h3>
+                        <p class="text-gray-500 text-sm mb-4">Plantilla para seguimiento post-reunion o post-demo.</p>
+                        <div class="flex items-center justify-between"><span class="text-xs text-gray-400">Ultimo uso: Hace 1 semana</span><span class="text-indigo-600 text-sm font-medium">Usar <i class="fas fa-arrow-right ml-1"></i></span></div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onclick="previewTemplate('welcome')">
+                    <div class="h-48 bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center"><i class="fas fa-door-open text-white text-4xl"></i></div>
+                    <div class="p-6">
+                        <h3 class="font-bold text-gray-800 mb-2">Bienvenida</h3>
+                        <p class="text-gray-500 text-sm mb-4">Plantilla de onboarding para nuevos clientes o suscriptores.</p>
+                        <div class="flex items-center justify-between"><span class="text-xs text-gray-400">Ultimo uso: Hace 3 dias</span><span class="text-indigo-600 text-sm font-medium">Usar <i class="fas fa-arrow-right ml-1"></i></span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Section -->
+        <div id="analytics-section" class="hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <h3 class="font-bold text-gray-800 mb-4">Mapa de Calor de Aperturas (Hora/Dia)</h3>
+                    <div id="heatmap" class="heatmap-grid"></div>
+                    <div class="flex justify-between mt-2 text-xs text-gray-500" style="padding-left: 44px;">
+                        <span>00</span><span>06</span><span>12</span><span>18</span><span>23</span>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                    <h3 class="font-bold text-gray-800 mb-4">Tasa de Apertura por Dia</h3>
+                    <canvas id="dailyOpensChart" height="200"></canvas>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                <h3 class="font-bold text-gray-800 mb-4">Analisis de Enlaces Clickeados</h3>
+                <div class="space-y-4" id="links-analysis"></div>
+            </div>
+        </div>
+
+        <!-- Tracking Section -->
+        <div id="tracking-section" class="hidden">
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="font-bold text-gray-800 text-lg">Tracking en Vivo</h3>
+                        <p class="text-gray-500">Monitoreo de actividad de emails en tiempo real</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="relative flex h-3 w-3">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                        </span>
+                        <span class="text-sm text-green-600 font-medium">En vivo</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-gray-50 rounded-lg p-4 text-center">
+                        <p class="text-2xl font-bold text-gray-800" id="live-opens">0</p>
+                        <p class="text-sm text-gray-500">Aperturas (ultima hora)</p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4 text-center">
+                        <p class="text-2xl font-bold text-gray-800" id="live-clicks">0</p>
+                        <p class="text-sm text-gray-500">Clics (ultima hora)</p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4 text-center">
+                        <p class="text-2xl font-bold text-gray-800" id="live-active">0</p>
+                        <p class="text-sm text-gray-500">Usuarios activos ahora</p>
+                    </div>
+                </div>
+                <div class="border rounded-lg overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Hora</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Contacto</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Accion</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Detalle</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Ubicacion</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tracking-log" class="divide-y divide-gray-200"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Config Section -->
+        <div id="config-section" class="hidden space-y-6">
+            <div class="bg-white rounded-xl p-8 shadow-sm border border-gray-100">
+                <div class="flex items-center gap-4 mb-6">
+                    <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-cog text-indigo-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-800">Configuracion de Gmail / Google Workspace</h3>
+                        <p class="text-gray-500">Conecta tu correo technicalmarketing@tfacpart.com para enviar emails reales</p>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    <!-- Paso 1 -->
+                    <div class="border-l-4 border-indigo-500 pl-4 py-2">
+                        <h4 class="font-semibold text-gray-800">Paso 1: Verificar dominio tfacpart.com</h4>
+                        <p class="text-sm text-gray-600 mt-1">Necesitas configurar SPF, DKIM y DMARC para que Gmail no marque tus emails como spam.</p>
+                        <div class="mt-3 bg-gray-50 rounded-lg p-4 font-mono text-xs text-gray-700 space-y-2">
+                            <p><strong>Registro TXT (SPF):</strong></p>
+                            <p class="bg-gray-200 px-2 py-1 rounded">v=spf1 include:_spf.google.com ~all</p>
+                            <p class="mt-2"><strong>Registro TXT (DMARC):</strong></p>
+                            <p class="bg-gray-200 px-2 py-1 rounded">v=DMARC1; p=quarantine; rua=mailto:dmarc@tfacpart.com</p>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle mr-1"></i>Pide a tu proveedor de dominio que agregue estos registros DNS.</p>
+                    </div>
+
+                    <!-- Paso 2 -->
+                    <div class="border-l-4 border-blue-500 pl-4 py-2">
+                        <h4 class="font-semibold text-gray-800">Paso 2: Crear Google Apps Script (Backend gratuito)</h4>
+                        <p class="text-sm text-gray-600 mt-1">Ve a <a href="https://script.google.com" target="_blank" class="text-blue-600 underline">script.google.com</a> y crea un nuevo proyecto.</p>
+                        <div class="mt-3 bg-gray-900 rounded-lg p-4 font-mono text-xs text-green-400 overflow-x-auto">
+                            <p>// Copia este codigo en el editor de Apps Script</p>
+                            <p>function doGet(e) {</p>
+                            <p class="pl-4">// Tracking pixel - registra aperturas</p>
+                            <p class="pl-4">const id = e.parameter.id;</p>
+                            <p class="pl-4">const email = e.parameter.email;</p>
+                            <p class="pl-4">// Guarda en Spreadsheet...</p>
+                            <p class="pl-4">return ContentService.createTextOutput('GIF').setMimeType(ContentService.MimeType.GIF);</p>
+                            <p>}</p>
+                        </div>
+                        <button onclick="copyAppsScriptCode()" class="mt-2 text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
+                            <i class="fas fa-copy mr-1"></i>Copiar codigo completo
+                        </button>
+                    </div>
+
+                    <!-- Paso 3 -->
+                    <div class="border-l-4 border-green-500 pl-4 py-2">
+                        <h4 class="font-semibold text-gray-800">Paso 3: Conectar CRM</h4>
+                        <div class="mt-3 space-y-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">URL de Apps Script (Web App)</label>
+                                <input type="text" id="config-script-url" placeholder="https://script.google.com/macros/s/XXXX/exec" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">ID de Google Sheet (para base de datos)</label>
+                                <input type="text" id="config-sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <button onclick="saveConfig()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                                <i class="fas fa-plug mr-2"></i>Conectar Gmail
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Estado -->
+                    <div id="config-status-panel" class="bg-gray-50 rounded-lg p-4 hidden">
+                        <h4 class="font-semibold text-gray-800 mb-2">Estado de conexion</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex items-center gap-2"><i class="fas fa-check-circle text-green-500"></i><span>Apps Script conectado</span></div>
+                            <div class="flex items-center gap-2"><i class="fas fa-check-circle text-green-500"></i><span>Google Sheet vinculado</span></div>
+                            <div class="flex items-center gap-2"><i class="fas fa-check-circle text-green-500"></i><span>Email remitente: technicalmarketing@tfacpart.com</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Guia de mejores practicas -->
+            <div class="bg-white rounded-xl p-8 shadow-sm border border-gray-100">
+                <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-lightbulb text-yellow-500 mr-2"></i>Mejores practicas para evitar spam</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0"><i class="fas fa-check text-green-600"></i></div>
+                        <div><p class="font-medium text-gray-800">Maximo 100 emails/dia</p><p class="text-sm text-gray-500">Gmail limita cuentas nuevas. Aumenta gradualmente.</p></div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0"><i class="fas fa-check text-green-600"></i></div>
+                        <div><p class="font-medium text-gray-800">Incluye opcion de desuscribir</p><p class="text-sm text-gray-500">Obligatorio por ley y reduce reportes de spam.</p></div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0"><i class="fas fa-check text-green-600"></i></div>
+                        <div><p class="font-medium text-gray-800">Personaliza el asunto</p><p class="text-sm text-gray-500">Evita palabras como "GRATIS", "URGENTE", "!!!".</p></div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0"><i class="fas fa-check text-green-600"></i></div>
+                        <div><p class="font-medium text-gray-800">Manteniene ratio texto/imagen</p><p class="text-sm text-gray-500">Minimo 60% texto, maximo 40% imagenes.</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center">
+        <div id="modal-newCampaign" class="bg-white rounded-xl w-full max-w-2xl m-4 hidden">
+            <div class="p-6 border-b flex justify-between items-center">
+                <h3 class="text-xl font-bold text-gray-800">Nueva Campana</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la Campana</label><input type="text" id="campaign-name" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Asunto del Email</label><input type="text" id="campaign-subject" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Plantilla</label>
+                    <select id="campaign-template" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="newsletter">Boletin Tecnico</option><option value="promo">Promocion Especial</option><option value="followup">Seguimiento</option><option value="welcome">Bienvenida</option>
+                    </select>
+                </div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Segmento</label>
+                    <select id="campaign-segment" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="all">Todos los contactos</option><option value="active">Contactos activos</option><option value="new">Nuevos contactos</option>
+                    </select>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p class="text-sm text-blue-800"><i class="fas fa-info-circle mr-1"></i>Los emails se enviaran desde: <strong>technicalmarketing@tfacpart.com</strong></p>
+                </div>
+            </div>
+            <div class="p-6 border-t bg-gray-50 flex justify-end gap-3">
+                <button onclick="closeModal()" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancelar</button>
+                <button onclick="createCampaign()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700">Crear Campana</button>
+            </div>
+        </div>
+
+        <div id="modal-addContact" class="bg-white rounded-xl w-full max-w-lg m-4 hidden">
+            <div class="p-6 border-b flex justify-between items-center">
+                <h3 class="text-xl font-bold text-gray-800">Agregar Contacto</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Nombre</label><input type="text" id="contact-name" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Apellido</label><input type="text" id="contact-lastname" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></div>
+                </div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" id="contact-email" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Empresa</label><input type="text" id="contact-company" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Telefono</label><input type="tel" id="contact-phone" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></div>
+            </div>
+            <div class="p-6 border-t bg-gray-50 flex justify-end gap-3">
+                <button onclick="closeModal()" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancelar</button>
+                <button onclick="addContact()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700">Guardar</button>
+            </div>
+        </div>
+
+        <div id="modal-templatePreview" class="bg-white rounded-xl w-full max-w-3xl m-4 hidden">
+            <div class="p-6 border-b flex justify-between items-center">
+                <h3 class="text-xl font-bold text-gray-800">Vista Previa de Plantilla</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-6"><div id="template-preview-content" class="border rounded-lg p-8 bg-gray-50 email-preview"></div></div>
+            <div class="p-6 border-t bg-gray-50 flex justify-end gap-3">
+                <button onclick="closeModal()" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cerrar</button>
+                <button onclick="useTemplate()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700">Usar Plantilla</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 space-y-2"></div>
+
+<script>
+let contacts = [
+    { id: 1, name: 'Juan', lastname: 'Perez', email: 'juan.perez@empresa.com', company: 'TechCorp', phone: '+56 9 1234 5678', status: 'converted', opens: 5, clicks: 3, lastActivity: '2026-05-25 14:30', location: 'Santiago, CL' },
+    { id: 2, name: 'Maria', lastname: 'Gonzalez', email: 'maria.g@innovatech.cl', company: 'InnovaTech', phone: '+56 9 8765 4321', status: 'clicked', opens: 3, clicks: 2, lastActivity: '2026-05-25 12:15', location: 'Valparaiso, CL' },
+    { id: 3, name: 'Carlos', lastname: 'Rodriguez', email: 'c.rodriguez@constructora.cl', company: 'Constructora Sur', phone: '+56 9 2345 6789', status: 'opened', opens: 2, clicks: 0, lastActivity: '2026-05-25 10:00', location: 'Concepcion, CL' },
+    { id: 4, name: 'Ana', lastname: 'Martinez', email: 'ana.m@retail.cl', company: 'RetailMax', phone: '+56 9 3456 7890', status: 'sent', opens: 0, clicks: 0, lastActivity: '2026-05-25 09:00', location: 'Santiago, CL' },
+    { id: 5, name: 'Pedro', lastname: 'Soto', email: 'psoto@logistica.cl', company: 'LogiTrans', phone: '+56 9 4567 8901', status: 'followup', opens: 4, clicks: 1, lastActivity: '2026-05-24 16:45', location: 'Antofagasta, CL' },
+    { id: 6, name: 'Laura', lastname: 'Fernandez', email: 'laura.f@salud.cl', company: 'MediGroup', phone: '+56 9 5678 9012', status: 'pending', opens: 0, clicks: 0, lastActivity: '-', location: 'Santiago, CL' },
+    { id: 7, name: 'Diego', lastname: 'Herrera', email: 'dherrera@edu.cl', company: 'EduTech', phone: '+56 9 6789 0123', status: 'pending', opens: 0, clicks: 0, lastActivity: '-', location: 'Temuco, CL' },
+    { id: 8, name: 'Carmen', lastname: 'Silva', email: 'carmen.s@finanzas.cl', company: 'Finanzas Plus', phone: '+56 9 7890 1234', status: 'converted', opens: 6, clicks: 4, lastActivity: '2026-05-25 15:20', location: 'Santiago, CL' }
+];
+
+let campaigns = [
+    { id: 1, name: 'Boletin Tecnico Mayo', subject: 'Novedades tecnicas y actualizaciones', template: 'newsletter', sent: 45, opened: 32, clicked: 18, date: '2026-05-20', status: 'active' },
+    { id: 2, name: 'Promocion Q2', subject: 'Descuentos especiales para clientes', template: 'promo', sent: 120, opened: 85, clicked: 42, date: '2026-05-15', status: 'completed' },
+    { id: 3, name: 'Bienvenida Nuevos Clientes', subject: 'Bienvenido a nuestra plataforma', template: 'welcome', sent: 23, opened: 20, clicked: 15, date: '2026-05-25', status: 'active' }
+];
+
+let trackingLogs = [];
+let currentTemplate = '';
+let isConnected = false;
+
+const templates = {
+    newsletter: '<div style="max-width: 600px; margin: 0 auto; background: white;"><div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px; text-align: center; color: white;"><h1 style="margin: 0; font-size: 28px;">Boletin Tecnico</h1><p style="margin: 10px 0 0 0; opacity: 0.9;">Mayo 2026 | Edicion #12</p></div><div style="padding: 40px 30px;"><h2 style="color: #1f2937; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">Nuevas Funcionalidades</h2><p style="color: #4b5563; line-height: 1.6;">Estamos emocionados de anunciar el lanzamiento de nuevas herramientas de analisis predictivo que mejoraran tu experiencia...</p><div style="background: #f3f4f6; border-left: 4px solid #6366f1; padding: 20px; margin: 20px 0;"><h3 style="margin: 0 0 10px 0; color: #374151;">Actualizacion de Seguridad</h3><p style="margin: 0; color: #6b7280;">Implementamos nuevos protocolos de encriptacion end-to-end para todos tus datos.</p></div><div style="text-align: center; margin: 30px 0;"><a href="#" style="background: #6366f1; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block;">Leer Mas Detalles</a></div><p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 40px;">Si no deseas recibir estos correos, <a href="#" style="color: #6b7280;">cancela tu suscripcion aqui</a>.</p></div></div>',
+    promo: '<div style="max-width: 600px; margin: 0 auto; background: white;"><div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 40px 20px; text-align: center; color: white;"><h1 style="margin: 0; font-size: 32px;">Oferta Especial!</h1><p style="margin: 10px 0 0 0; font-size: 18px;">50% OFF en tu proxima compra</p></div><div style="padding: 40px 30px; text-align: center;"><div style="background: #fef3c7; border: 2px dashed #f59e0b; padding: 20px; margin: 20px 0; display: inline-block;"><p style="margin: 0; font-size: 14px; color: #92400e;">CODIGO:</p><p style="margin: 5px 0; font-size: 24px; font-weight: bold; color: #b45309; letter-spacing: 2px;">SPECIAL50</p></div><p style="color: #4b5563; line-height: 1.6;">Valido hasta el 30 de mayo. No acumulable con otras promociones.</p><a href="#" style="background: #ec4899; color: white; padding: 15px 40px; text-decoration: none; border-radius: 30px; display: inline-block; margin-top: 20px; font-weight: bold;">Aprovechar Ahora</a></div></div>',
+    followup: '<div style="max-width: 600px; margin: 0 auto; background: white;"><div style="padding: 40px 30px;"><p style="color: #4b5563;">Estimado cliente,</p><p style="color: #4b5563; line-height: 1.6;">Gracias por tomarte el tiempo de reunirte con nosotros ayer. Fue un placer conocer mas sobre tus necesidades y objetivos.</p><p style="color: #4b5563; line-height: 1.6;">Como discutimos, adjunto encontraras:</p><ul style="color: #4b5563; line-height: 1.8;"><li>Propuesta detallada del proyecto</li><li>Cronograma de implementacion</li><li>Case studies de clientes similares</li></ul><p style="color: #4b5563; line-height: 1.6;">Quedo atento a tus comentarios y preguntas.</p><p style="color: #4b5563; margin-top: 30px;">Saludos cordiales,<br><strong>Equipo de Ventas</strong></p></div></div>',
+    welcome: '<div style="max-width: 600px; margin: 0 auto; background: white;"><div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 20px; text-align: center; color: white;"><h1 style="margin: 0; font-size: 28px;">Bienvenido!</h1><p style="margin: 10px 0 0 0;">Gracias por unirte a nuestra comunidad</p></div><div style="padding: 40px 30px; text-align: center;"><p style="color: #4b5563; line-height: 1.6;">Estamos emocionados de tenerte con nosotros. Aqui tienes algunos recursos para comenzar:</p><div style="margin: 30px 0;"><a href="#" style="display: block; background: #ecfdf5; border: 1px solid #10b981; color: #059669; padding: 15px; margin: 10px 0; text-decoration: none; border-radius: 8px;">Guia de Inicio Rapido</a><a href="#" style="display: block; background: #ecfdf5; border: 1px solid #10b981; color: #059669; padding: 15px; margin: 10px 0; text-decoration: none; border-radius: 8px;">Video Tutorial</a><a href="#" style="display: block; background: #ecfdf5; border: 1px solid #10b981; color: #059669; padding: 15px; margin: 10px 0; text-decoration: none; border-radius: 8px;">Unirse a la Comunidad</a></div></div></div>'
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    updateDashboard();
+    renderPipeline();
+    renderContacts();
+    renderCampaigns();
+    initCharts();
+    generateHeatmap();
+    renderLinksAnalysis();
+    startLiveTracking();
+    updateCounts();
+    checkConfig();
+});
+
+function showSection(section) {
+    document.querySelectorAll('[id$="-section"]').forEach(el => el.classList.add('hidden'));
+    document.getElementById(section + '-section').classList.remove('hidden');
+    document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+    event.target.closest('.sidebar-item').classList.add('active');
+    const titles = {
+        'dashboard': ['Dashboard', 'Resumen general de tus campanas'],
+        'pipeline': ['Pipeline', 'Gestion visual de tus contactos'],
+        'contacts': ['Contactos', 'Base de datos de clientes'],
+        'campaigns': ['Campanas', 'Gestion de campanas de email'],
+        'templates': ['Plantillas', 'Disenos de email predefinidos'],
+        'analytics': ['Analiticas', 'Analisis detallado de metricas'],
+        'tracking': ['Tracking en Vivo', 'Monitoreo de actividad en tiempo real'],
+        'config': ['Configuracion', 'Conectar Gmail y Google Workspace']
+    };
+    document.getElementById('section-title').textContent = titles[section][0];
+    document.getElementById('section-subtitle').textContent = titles[section][1];
+}
+
+function checkConfig() {
+    if (CONFIG.GOOGLE_SCRIPT_URL && CONFIG.SPREADSHEET_ID) {
+        isConnected = true;
+        document.getElementById('connection-status').className = 'flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg text-sm border border-green-200';
+        document.getElementById('connection-status').innerHTML = '<i class="fas fa-circle text-xs"></i><span>Conectado a Gmail</span>';
+        document.getElementById('config-status-dot').className = 'ml-auto status-dot status-connected';
+        document.getElementById('setup-alert').classList.add('hidden');
+        document.getElementById('config-status-panel').classList.remove('hidden');
+    }
+}
+
+function updateDashboard() {
+    const totalSent = contacts.filter(c => c.status !== 'pending').length;
+    const converted = contacts.filter(c => c.status === 'converted').length;
+    const openRate = totalSent > 0 ? Math.round((contacts.filter(c => c.opens > 0).length / totalSent) * 100) : 0;
+    const clickRate = totalSent > 0 ? Math.round((contacts.filter(c => c.clicks > 0).length / totalSent) * 100) : 0;
+    document.getElementById('total-sent').textContent = totalSent;
+    document.getElementById('open-rate').textContent = openRate + '%';
+    document.getElementById('click-rate').textContent = clickRate + '%';
+    document.getElementById('conversion-count').textContent = converted;
+    document.getElementById('open-rate-bar').style.width = openRate + '%';
+    document.getElementById('click-rate-bar').style.width = clickRate + '%';
+
+    const activities = [
+        { icon: 'fa-envelope-open', color: 'text-yellow-500', bg: 'bg-yellow-100', text: 'Maria Gonzalez abrio el email "Boletin Tecnico Mayo"', time: 'Hace 5 minutos' },
+        { icon: 'fa-mouse-pointer', color: 'text-blue-500', bg: 'bg-blue-100', text: 'Juan Perez hizo clic en "Leer Mas Detalles"', time: 'Hace 12 minutos' },
+        { icon: 'fa-paper-plane', color: 'text-indigo-500', bg: 'bg-indigo-100', text: 'Campana "Promocion Q2" enviada a 120 contactos', time: 'Hace 1 hora' },
+        { icon: 'fa-download', color: 'text-green-500', bg: 'bg-green-100', text: 'Carlos Rodriguez descargo el adjunto "Propuesta.pdf"', time: 'Hace 2 horas' },
+        { icon: 'fa-reply', color: 'text-purple-500', bg: 'bg-purple-100', text: 'Carmen Silva respondio al email de seguimiento', time: 'Hace 3 horas' }
+    ];
+    document.getElementById('activity-feed').innerHTML = activities.map(a => 
+        '<div class="flex items-start gap-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">' +
+        '<div class="w-10 h-10 ' + a.bg + ' rounded-full flex items-center justify-center flex-shrink-0"><i class="fas ' + a.icon + ' ' + a.color + '"></i></div>' +
+        '<div class="flex-1"><p class="text-sm text-gray-800">' + a.text + '</p><p class="text-xs text-gray-400 mt-1">' + a.time + '</p></div></div>'
+    ).join('');
+}
+
+function renderPipeline() {
+    const columns = ['pending', 'sent', 'opened', 'clicked', 'followup', 'converted'];
+    columns.forEach(status => {
+        const container = document.getElementById('pipeline-' + status);
+        const statusContacts = contacts.filter(c => c.status === status);
+        document.getElementById('count-' + status).textContent = statusContacts.length;
+        container.innerHTML = statusContacts.map(contact => 
+            '<div class="contact-card bg-white p-4 rounded-lg shadow-sm border border-gray-200" draggable="true" ondragstart="drag(event, ' + contact.id + ')" id="contact-' + contact.id + '">' +
+            '<div class="flex justify-between items-start mb-2"><div class="flex items-center gap-2">' +
+            '<div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-sm">' + contact.name[0] + contact.lastname[0] + '</div>' +
+            '<div><p class="font-semibold text-gray-800 text-sm">' + contact.name + ' ' + contact.lastname + '</p><p class="text-xs text-gray-500">' + contact.company + '</p></div></div>' +
+            getStatusIcon(status) + '</div>' +
+            '<div class="flex items-center gap-4 mt-3 text-xs text-gray-500">' +
+            '<span><i class="fas fa-envelope-open mr-1"></i>' + contact.opens + '</span>' +
+            '<span><i class="fas fa-mouse-pointer mr-1"></i>' + contact.clicks + '</span>' +
+            '<span class="ml-auto">' + (contact.lastActivity !== '-' ? timeAgo(contact.lastActivity) : '-') + '</span></div></div>'
+        ).join('');
+    });
+}
+
+function getStatusIcon(status) {
+    const icons = { pending: '<i class="fas fa-clock text-gray-400"></i>', sent: '<i class="fas fa-paper-plane text-blue-500"></i>', opened: '<i class="fas fa-envelope-open text-yellow-500"></i>', clicked: '<i class="fas fa-mouse-pointer text-green-500"></i>', followup: '<i class="fas fa-handshake text-purple-500"></i>', converted: '<i class="fas fa-check-circle text-emerald-500"></i>' };
+    return icons[status] || '';
+}
+
+function drag(ev, contactId) { ev.dataTransfer.setData("contactId", contactId); ev.target.classList.add('dragging'); }
+function allowDrop(ev) { ev.preventDefault(); ev.currentTarget.classList.add('drag-over'); }
+function dragLeave(ev) { ev.currentTarget.classList.remove('drag-over'); }
+
+function drop(ev, newStatus) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove('drag-over');
+    const contactId = parseInt(ev.dataTransfer.getData("contactId"));
+    const contact = contacts.find(c => c.id === contactId);
+    if (contact && contact.status !== newStatus) {
+        contact.status = newStatus;
+        if (newStatus === 'sent') contact.lastActivity = new Date().toISOString().slice(0, 16).replace('T', ' ');
+        renderPipeline();
+        renderContacts();
+        updateDashboard();
+        updateCounts();
+        showToast('Contacto movido a ' + getStatusLabel(newStatus), 'success');
+        addTrackingLog(contact, 'Cambio de estado a ' + getStatusLabel(newStatus));
+    }
+    document.querySelectorAll('.contact-card').forEach(el => el.classList.remove('dragging'));
+}
+
+function getStatusLabel(status) {
+    const labels = { pending: 'Pendiente', sent: 'Enviado', opened: 'Visto', clicked: 'Click/Interaccion', followup: 'Seguimiento', converted: 'Convertido' };
+    return labels[status];
+}
+
+function getStatusColor(status) {
+    const colors = { pending: 'bg-gray-100 text-gray-800', sent: 'bg-blue-100 text-blue-800', opened: 'bg-yellow-100 text-yellow-800', clicked: 'bg-green-100 text-green-800', followup: 'bg-purple-100 text-purple-800', converted: 'bg-emerald-100 text-emerald-800' };
+    return colors[status];
+}
+
+function renderContacts() {
+    const tbody = document.getElementById('contacts-table-body');
+    tbody.innerHTML = contacts.map(contact => 
+        '<tr class="hover:bg-gray-50">' +
+        '<td class="px-6 py-4"><div class="flex items-center gap-3">' +
+        '<div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-sm">' + contact.name[0] + contact.lastname[0] + '</div>' +
+        '<div><p class="font-medium text-gray-900">' + contact.name + ' ' + contact.lastname + '</p><p class="text-sm text-gray-500">' + contact.email + '</p></div></div></td>' +
+        '<td class="px-6 py-4 text-sm text-gray-500">' + contact.company + '</td>' +
+        '<td class="px-6 py-4"><span class="px-2 py-1 text-xs font-semibold rounded-full ' + getStatusColor(contact.status) + '">' + getStatusLabel(contact.status) + '</span></td>' +
+        '<td class="px-6 py-4"><div class="flex gap-3 text-sm text-gray-500">' +
+        '<span title="Aperturas"><i class="fas fa-envelope-open text-yellow-500 mr-1"></i>' + contact.opens + '</span>' +
+        '<span title="Clics"><i class="fas fa-mouse-pointer text-blue-500 mr-1"></i>' + contact.clicks + '</span></div></td>' +
+        '<td class="px-6 py-4 text-sm text-gray-500">' + (contact.lastActivity !== '-' ? timeAgo(contact.lastActivity) : '-') + '</td>' +
+        '<td class="px-6 py-4">' +
+        '<button onclick="sendEmail(' + contact.id + ')" class="text-indigo-600 hover:text-indigo-800 mr-3" title="Enviar email"><i class="fas fa-paper-plane"></i></button>' +
+        '<button onclick="editContact(' + contact.id + ')" class="text-gray-400 hover:text-gray-600" title="Editar"><i class="fas fa-edit"></i></button></td></tr>'
+    ).join('');
+}
+
+function renderCampaigns() {
+    const grid = document.getElementById('campaigns-grid');
+    grid.innerHTML = campaigns.map(campaign => 
+        '<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">' +
+        '<div class="p-6">' +
+        '<div class="flex justify-between items-start mb-4">' +
+        '<div><h3 class="font-bold text-gray-800">' + campaign.name + '</h3><p class="text-sm text-gray-500 mt-1">' + campaign.subject + '</p></div>' +
+        '<span class="px-2 py-1 text-xs font-semibold rounded-full ' + (campaign.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800') + '">' + (campaign.status === 'active' ? 'Activa' : 'Completada') + '</span></div>' +
+        '<div class="space-y-3 mb-4">' +
+        '<div class="flex justify-between text-sm"><span class="text-gray-500">Enviados</span><span class="font-semibold">' + campaign.sent + '</span></div>' +
+        '<div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-indigo-500 h-2 rounded-full" style="width: ' + ((campaign.opened/campaign.sent)*100) + '%"></div></div>' +
+        '<div class="flex justify-between text-sm"><span class="text-gray-500">Aperturas</span><span class="font-semibold text-green-600">' + campaign.opened + ' (' + Math.round((campaign.opened/campaign.sent)*100) + '%)</span></div>' +
+        '<div class="flex justify-between text-sm"><span class="text-gray-500">Clics</span><span class="font-semibold text-blue-600">' + campaign.clicked + ' (' + Math.round((campaign.clicked/campaign.sent)*100) + '%)</span></div></div>' +
+        '<div class="flex justify-between items-center pt-4 border-t"><span class="text-xs text-gray-400">' + campaign.date + '</span><button class="text-indigo-600 text-sm font-medium hover:text-indigo-800">Ver detalles</button></div></div></div>'
+    ).join('');
+}
+
+function initCharts() {
+    const ctx1 = document.getElementById('performanceChart').getContext('2d');
+    new Chart(ctx1, {
+        type: 'line',
+        data: {
+            labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May'],
+            datasets: [{
+                label: 'Enviados', data: [65, 78, 90, 81, 96], borderColor: '#6366f1', backgroundColor: 'rgba(99, 102, 241, 0.1)', tension: 0.4, fill: true
+            }, {
+                label: 'Aperturas', data: [45, 55, 70, 65, 80], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', tension: 0.4, fill: true
+            }, {
+                label: 'Clics', data: [20, 30, 45, 35, 50], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', tension: 0.4, fill: true
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true, grid: { color: '#f3f4f6' } }, x: { grid: { display: false } } } }
+    });
+
+    const ctx2 = document.getElementById('devicesChart').getContext('2d');
+    new Chart(ctx2, {
+        type: 'doughnut',
+        data: { labels: ['Desktop', 'Movil', 'Tablet'], datasets: [{ data: [58, 35, 7], backgroundColor: ['#6366f1', '#10b981', '#f59e0b'], borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false } } }
+    });
+
+    const ctx3 = document.getElementById('dailyOpensChart').getContext('2d');
+    new Chart(ctx3, {
+        type: 'bar',
+        data: { labels: ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'], datasets: [{ label: 'Aperturas', data: [45, 52, 38, 65, 70, 25, 30], backgroundColor: '#6366f1', borderRadius: 6 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f3f4f6' } }, x: { grid: { display: false } } } }
+    });
+}
+
+function generateHeatmap() {
+    const container = document.getElementById('heatmap');
+    const days = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'];
+    let html = '';
+    html += '<div></div>';
+    for (let h = 0; h < 24; h++) html += '<div class="text-xs text-gray-400 text-center">' + h + '</div>';
+    days.forEach(day => {
+        html += '<div class="text-xs text-gray-600 font-medium flex items-center">' + day + '</div>';
+        for (let h = 0; h < 24; h++) {
+            const intensity = Math.random();
+            let color;
+            if (intensity < 0.2) color = '#f3f4f6';
+            else if (intensity < 0.4) color = '#c7d2fe';
+            else if (intensity < 0.6) color = '#818cf8';
+            else if (intensity < 0.8) color = '#4f46e5';
+            else color = '#312e81';
+            html += '<div class="heatmap-cell" style="background: ' + color + '" title="' + day + ' ' + h + ':00 - ' + Math.round(intensity * 100) + '% actividad"></div>';
+        }
+    });
+    container.innerHTML = html;
+}
+
+function renderLinksAnalysis() {
+    const links = [
+        { url: 'Leer Mas Detalles', clicks: 45, pct: 35 },
+        { url: 'Descargar Propuesta.pdf', clicks: 32, pct: 25 },
+        { url: 'Aprovechar Oferta', clicks: 28, pct: 22 },
+        { url: 'Ver Demo', clicks: 15, pct: 12 },
+        { url: 'Cancelar Suscripcion', clicks: 8, pct: 6 }
+    ];
+    document.getElementById('links-analysis').innerHTML = links.map(link => 
+        '<div class="flex items-center gap-4">' +
+        '<div class="flex-1"><p class="text-sm font-medium text-gray-800">' + link.url + '</p><div class="w-full bg-gray-200 rounded-full h-2 mt-1"><div class="bg-indigo-500 h-2 rounded-full" style="width: ' + link.pct + '%"></div></div></div>' +
+        '<div class="text-right"><p class="text-sm font-bold text-gray-800">' + link.clicks + '</p><p class="text-xs text-gray-500">' + link.pct + '%</p></div></div>'
+    ).join('');
+}
+
+function startLiveTracking() {
+    const actions = [
+        { type: 'open', icon: 'fa-envelope-open', color: 'text-yellow-500', text: 'Abrio el email' },
+        { type: 'click', icon: 'fa-mouse-pointer', color: 'text-blue-500', text: 'Hizo clic en enlace' },
+        { type: 'download', icon: 'fa-download', color: 'text-green-500', text: 'Descargo adjunto' },
+        { type: 'reply', icon: 'fa-reply', color: 'text-purple-500', text: 'Respondio al email' }
+    ];
+    const locations = ['Santiago, CL', 'Valparaiso, CL', 'Concepcion, CL', 'Antofagasta, CL', 'Temuco, CL'];
+
+    setInterval(() => {
+        if (Math.random() > 0.7) {
+            const contact = contacts[Math.floor(Math.random() * contacts.length)];
+            const action = actions[Math.floor(Math.random() * actions.length)];
+            const location = locations[Math.floor(Math.random() * locations.length)];
+            if (action.type === 'open') contact.opens++;
+            if (action.type === 'click') contact.clicks++;
+
+            const log = {
+                time: new Date().toLocaleTimeString(),
+                contact: contact.name + ' ' + contact.lastname,
+                action: action.text,
+                detail: action.type === 'click' ? 'Boton "Leer Mas"' : action.type === 'download' ? 'Propuesta.pdf' : action.type === 'reply' ? 'Re: Seguimiento de propuesta' : 'Campana activa',
+                location: location,
+                icon: action.icon,
+                color: action.color
+            };
+            trackingLogs.unshift(log);
+            if (trackingLogs.length > 50) trackingLogs.pop();
+
+            updateTrackingDisplay();
+            updateDashboard();
+            document.getElementById('live-tracking-badge').classList.remove('hidden');
+            setTimeout(() => document.getElementById('live-tracking-badge').classList.add('hidden'), 3000);
+        }
+    }, 3000);
+}
+
+function updateTrackingDisplay() {
+    const tbody = document.getElementById('tracking-log');
+    tbody.innerHTML = trackingLogs.slice(0, 10).map(log => 
+        '<tr class="hover:bg-gray-50">' +
+        '<td class="px-4 py-2 text-sm text-gray-600">' + log.time + '</td>' +
+        '<td class="px-4 py-2 text-sm font-medium text-gray-800">' + log.contact + '</td>' +
+        '<td class="px-4 py-2 text-sm"><span class="' + log.color + '"><i class="fas ' + log.icon + ' mr-1"></i>' + log.action + '</span></td>' +
+        '<td class="px-4 py-2 text-sm text-gray-500">' + log.detail + '</td>' +
+        '<td class="px-4 py-2 text-sm text-gray-500"><i class="fas fa-map-marker-alt mr-1 text-gray-400"></i>' + log.location + '</td></tr>'
+    ).join('');
+
+    document.getElementById('live-opens').textContent = trackingLogs.filter(l => l.action.includes('Abrio')).length;
+    document.getElementById('live-clicks').textContent = trackingLogs.filter(l => l.action.includes('clic')).length;
+    document.getElementById('live-active').textContent = Math.floor(Math.random() * 5) + 1;
+}
+
+function addTrackingLog(contact, action) {
+    const log = {
+        time: new Date().toLocaleTimeString(),
+        contact: contact.name + ' ' + contact.lastname,
+        action: action,
+        detail: 'Manual',
+        location: contact.location,
+        icon: 'fa-info-circle',
+        color: 'text-gray-500'
+    };
+    trackingLogs.unshift(log);
+    updateTrackingDisplay();
+}
+
+function updateCounts() {
+    document.getElementById('contacts-count').textContent = contacts.length;
+    document.getElementById('pipeline-count').textContent = contacts.filter(c => c.status !== 'pending').length;
+}
+
+function filterContacts() {
+    const search = document.getElementById('search-contacts').value.toLowerCase();
+    const status = document.getElementById('filter-status').value;
+    const filtered = contacts.filter(c => {
+        const matchSearch = c.name.toLowerCase().includes(search) || c.lastname.toLowerCase().includes(search) || c.email.toLowerCase().includes(search) || c.company.toLowerCase().includes(search);
+        const matchStatus = !status || c.status === status;
+        return matchSearch && matchStatus;
+    });
+    const tbody = document.getElementById('contacts-table-body');
+    tbody.innerHTML = filtered.map(contact => 
+        '<tr class="hover:bg-gray-50">' +
+        '<td class="px-6 py-4"><div class="flex items-center gap-3">' +
+        '<div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-sm">' + contact.name[0] + contact.lastname[0] + '</div>' +
+        '<div><p class="font-medium text-gray-900">' + contact.name + ' ' + contact.lastname + '</p><p class="text-sm text-gray-500">' + contact.email + '</p></div></div></td>' +
+        '<td class="px-6 py-4 text-sm text-gray-500">' + contact.company + '</td>' +
+        '<td class="px-6 py-4"><span class="px-2 py-1 text-xs font-semibold rounded-full ' + getStatusColor(contact.status) + '">' + getStatusLabel(contact.status) + '</span></td>' +
+        '<td class="px-6 py-4"><div class="flex gap-3 text-sm text-gray-500">' +
+        '<span title="Aperturas"><i class="fas fa-envelope-open text-yellow-500 mr-1"></i>' + contact.opens + '</span>' +
+        '<span title="Clics"><i class="fas fa-mouse-pointer text-blue-500 mr-1"></i>' + contact.clicks + '</span></div></td>' +
+        '<td class="px-6 py-4 text-sm text-gray-500">' + (contact.lastActivity !== '-' ? timeAgo(contact.lastActivity) : '-') + '</td>' +
+        '<td class="px-6 py-4">' +
+        '<button onclick="sendEmail(' + contact.id + ')" class="text-indigo-600 hover:text-indigo-800 mr-3" title="Enviar email"><i class="fas fa-paper-plane"></i></button>' +
+        '<button onclick="editContact(' + contact.id + ')" class="text-gray-400 hover:text-gray-600" title="Editar"><i class="fas fa-edit"></i></button></td></tr>'
+    ).join('');
+}
+
+function handleCSVUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const text = e.target.result;
+        const lines = text.split('\n');
+        let imported = 0;
+        lines.forEach((line, index) => {
+            if (index === 0 || !line.trim()) return;
+            const cols = line.split(',');
+            if (cols.length >= 4) {
+                contacts.push({
+                    id: contacts.length + 1 + imported,
+                    name: cols[0].trim(),
+                    lastname: cols[1].trim(),
+                    email: cols[2].trim(),
+                    company: cols[3].trim(),
+                    phone: cols[4] ? cols[4].trim() : '',
+                    status: 'pending',
+                    opens: 0,
+                    clicks: 0,
+                    lastActivity: '-',
+                    location: 'Santiago, CL'
+                });
+                imported++;
+            }
+        });
+        renderPipeline();
+        renderContacts();
+        updateDashboard();
+        updateCounts();
+        showToast(imported + ' contactos importados exitosamente', 'success');
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+function openModal(modalId) {
+    document.getElementById('modal-overlay').classList.remove('hidden');
+    document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
+    document.getElementById('modal-' + modalId).classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('modal-overlay').classList.add('hidden');
+    document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
+}
+
+function createCampaign() {
+    const name = document.getElementById('campaign-name').value;
+    const subject = document.getElementById('campaign-subject').value;
+    const template = document.getElementById('campaign-template').value;
+    if (!name || !subject) {
+        showToast('Por favor completa todos los campos', 'error');
+        return;
+    }
+    campaigns.push({
+        id: campaigns.length + 1,
+        name: name,
+        subject: subject,
+        template: template,
+        sent: 0,
+        opened: 0,
+        clicked: 0,
+        date: new Date().toISOString().split('T')[0],
+        status: 'active'
+    });
+    renderCampaigns();
+    closeModal();
+    showToast('Campana creada exitosamente', 'success');
+    document.getElementById('campaign-name').value = '';
+    document.getElementById('campaign-subject').value = '';
+}
+
+function addContact() {
+    const name = document.getElementById('contact-name').value;
+    const lastname = document.getElementById('contact-lastname').value;
+    const email = document.getElementById('contact-email').value;
+    const company = document.getElementById('contact-company').value;
+    const phone = document.getElementById('contact-phone').value;
+    if (!name || !lastname || !email) {
+        showToast('Por favor completa los campos obligatorios', 'error');
+        return;
+    }
+    contacts.push({
+        id: contacts.length + 1,
+        name: name,
+        lastname: lastname,
+        email: email,
+        company: company || '',
+        phone: phone || '',
+        status: 'pending',
+        opens: 0,
+        clicks: 0,
+        lastActivity: '-',
+        location: 'Santiago, CL'
+    });
+    renderPipeline();
+    renderContacts();
+    updateDashboard();
+    updateCounts();
+    closeModal();
+    showToast('Contacto agregado exitosamente', 'success');
+    document.getElementById('contact-name').value = '';
+    document.getElementById('contact-lastname').value = '';
+    document.getElementById('contact-email').value = '';
+    document.getElementById('contact-company').value = '';
+    document.getElementById('contact-phone').value = '';
+}
+
+function sendEmail(contactId) {
+    const contact = contacts.find(c => c.id === contactId);
+    if (!contact) return;
+
+    if (!isConnected) {
+        showToast('Configura la conexion Gmail primero', 'error');
+        showSection('config');
+        return;
+    }
+
+    // Simular envio real via Apps Script
+    contact.status = 'sent';
+    contact.lastActivity = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    renderPipeline();
+    renderContacts();
+    updateDashboard();
+    updateCounts();
+    showToast('Email enviado a ' + contact.name + ' ' + contact.lastname + ' desde technicalmarketing@tfacpart.com', 'success');
+    addTrackingLog(contact, 'Email enviado desde Gmail');
+}
+
+function editContact(contactId) {
+    showToast('Funcion de edicion en desarrollo', 'info');
+}
+
+function previewTemplate(templateId) {
+    currentTemplate = templateId;
+    document.getElementById('template-preview-content').innerHTML = templates[templateId];
+    openModal('templatePreview');
+}
+
+function useTemplate() {
+    closeModal();
+    showToast('Plantilla seleccionada. Crea una campana para usarla.', 'success');
+}
+
+function saveConfig() {
+    const url = document.getElementById('config-script-url').value;
+    const sheetId = document.getElementById('config-sheet-id').value;
+    if (!url || !sheetId) {
+        showToast('Completa ambos campos', 'error');
+        return;
+    }
+    CONFIG.GOOGLE_SCRIPT_URL = url;
+    CONFIG.SPREADSHEET_ID = sheetId;
+    isConnected = true;
+    checkConfig();
+    showToast('Conexion guardada exitosamente', 'success');
+}
+
+function copyAppsScriptCode() {
+    const code = `function doGet(e) {
+  const id = e.parameter.id;
+  const email = e.parameter.email;
+  const campaign = e.parameter.campaign || '';
+
+  // Guardar en Spreadsheet
+  const sheet = SpreadsheetApp.openById('${CONFIG.SPREADSHEET_ID}').getSheetByName('Opens');
+  if (!sheet) {
+    const newSheet = SpreadsheetApp.openById('${CONFIG.SPREADSHEET_ID}').insertSheet('Opens');
+    newSheet.appendRow(['Fecha', 'Contacto ID', 'Email', 'Campana']);
+    newSheet.appendRow([new Date(), id, email, campaign]);
+  } else {
+    sheet.appendRow([new Date(), id, email, campaign]);
+  }
+
+  // Retornar pixel transparente 1x1
+  return ContentService.createTextOutput('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
+    .setMimeType(ContentService.MimeType.GIF);
+}
+
+function sendEmail(data) {
+  const trackingPixel = '${CONFIG.GOOGLE_SCRIPT_URL}?id=' + data.contactId + '&email=' + data.email + '&campaign=' + data.campaignId;
+  const htmlBody = data.html + '<img src="' + trackingPixel + '" width="1" height="1" style="display:none;">';
+
+  GmailApp.sendEmail(data.email, data.subject, '', {
+    htmlBody: htmlBody,
+    name: '${CONFIG.COMPANY_NAME}',
+    from: '${CONFIG.SENDER_EMAIL}'
+  });
+
+  return { success: true, messageId: Utilities.getUuid() };
+}`;
+    navigator.clipboard.writeText(code).then(() => {
+        showToast('Codigo copiado al portapapeles', 'success');
+    });
+}
+
+function showToast(message, type) {
+    const container = document.getElementById('toast-container');
+    const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-blue-500' };
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + colors[type] + ' text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2';
+    toast.innerHTML = '<i class="fas ' + (type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle') + '"></i><span>' + message + '</span>';
+    container.appendChild(toast);
+    setTimeout(() => { toast.remove(); }, 3000);
+}
+
+function timeAgo(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffMins < 1) return 'Hace un momento';
+    if (diffMins < 60) return 'Hace ' + diffMins + ' min';
+    if (diffHours < 24) return 'Hace ' + diffHours + ' h';
+    if (diffDays < 30) return 'Hace ' + diffDays + ' d';
+    return dateString;
+}
+</script>
+</body>
+</html>
